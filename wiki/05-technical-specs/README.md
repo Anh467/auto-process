@@ -2,10 +2,247 @@
 
 ## Mục lục
 
-1. [Đặc tả API](#đặc-tả-api)
-2. [Định dạng dữ liệu](#định-dạng-dữ-liệu)
-3. [Cấu hình hệ thống](#cấu-hình-hệ-thống)
-4. [Performance Requirements](#performance-requirements)
+1. [CQRS Implementation với MediatR](#cqrs-implementation-với-mediatr)
+2. [Đặc tả API](#đặc-tả-api)
+3. [Định dạng dữ liệu](#định-dạng-dữ-liệu)
+4. [Cấu hình hệ thống](#cấu-hình-hệ-thống)
+5. [Performance Requirements](#performance-requirements)
+
+---
+
+## CQRS Implementation với MediatR
+
+Hệ thống sử dụng **CQRS (Command Query Responsibility Segregation)** pattern với **MediatR** library để tách biệt operations thành Commands (ghi) và Queries (đọc).
+
+### Kiến trúc CQRS
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         API Layer                                │
+│  Controllers → Send Command/Query → MediatR Pipeline             │
+└─────────────────────────────────────────────────────────────────┘
+                                    │
+                                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    MediatR Pipeline                              │
+│  ValidationBehavior → LoggingBehavior → PerformanceBehavior     │
+└─────────────────────────────────────────────────────────────────┘
+                                    │
+                    ┌───────────────┴───────────────┐
+                    │                               │
+                    ▼                               ▼
+┌───────────────────────────┐         ┌───────────────────────────┐
+│       Commands            │         │        Queries            │
+│   (Write Operations)      │         │   (Read Operations)       │
+│                           │         │                           │
+│ - UploadVideoCommand      │         │ - GetVideoByIdQuery       │
+│ - ProcessVideoCommand     │         │ - GetVideoListQuery       │
+│ - UpdateVideoStatusCommand│         │ - GetProcessingStatusQuery│
+└───────────────────────────┘         └───────────────────────────┘
+                    │                               │
+                    ▼                               ▼
+┌───────────────────────────┐         ┌───────────────────────────┐
+│    Command Handlers       │         │     Query Handlers        │
+└───────────────────────────┘         └───────────────────────────┘
+```
+
+### Project Structure (CQRS)
+
+```
+src/
+└── AutoProcess.Application/
+    ├── Features/
+    │   ├── Videos/
+    │   │   ├── Commands/
+    │   │   │   ├── UploadVideo/
+    │   │   │   │   ├── UploadVideoCommand.cs           # Request DTO
+    │   │   │   │   ├── UploadVideoCommandHandler.cs    # Handler
+    │   │   │   │   ├── UploadVideoCommandValidator.cs  # FluentValidation
+    │   │   │   │   └── UploadVideoResponse.cs          # Response DTO
+    │   │   │   ├── ProcessVideo/
+    │   │   │   └── UpdateVideoStatus/
+    │   │   └── Queries/
+    │   │       ├── GetVideoById/
+    │   │       │   ├── GetVideoByIdQuery.cs
+    │   │       │   ├── GetVideoByIdQueryHandler.cs
+    │   │       │   └── VideoDto.cs
+    │   │       ├── GetVideoList/
+    │   │       └── GetProcessingStatus/
+    │   ├── Audio/
+    │   └── Auth/
+    ├── Common/
+    │   ├── Behaviors/                    # MediatR Pipeline Behaviors
+    │   │   ├── ValidationBehavior.cs     # Tự động validate command/query
+    │   │   ├── LoggingBehavior.cs        # Logging requests/responses
+    │   │   └── PerformanceBehavior.cs    # Đo performance
+    │   ├── Exceptions/
+    │   ├── Interfaces/
+    │   └── Mappings/
+    └── DependencyInjection.cs
+```
+
+### Command Implementation Example
+
+```csharp
+// Features/Videos/Commands/UploadVideo/UploadVideoCommand.cs
+public record UploadVideoCommand : IRequest<Result<UploadVideoResponse>>
+{
+    public IFormFile File { get; set; } = null!;
+    public string Title { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public ProcessingOptions Options { get; set; } = new();
+    public Guid UserId { get; set; }
+}
+
+// Features/Videos/Commands/UploadVideo/UploadVideoCommandHandler.cs
+public class UploadVideoCommandHandler
+    : IRequestHandler<UploadVideoCommand, Result<UploadVideoResponse>>
+{
+    private readonly IVideoRepository _videoRepository;
+    private readonly IStorageService _storageService;
+    private readonly IUnitOfWork _unitOfWork;
+    private readonly ILogger<UploadVideoCommandHandler> _logger;
+
+    public async Task<Result<UploadVideoResponse>> Handle(
+        UploadVideoCommand request,
+        CancellationToken cancellationToken)
+    {
+        // 1. Upload file to storage
+        var filePath = await _storageService.UploadVideoAsync(
+            request.File, request.UserId, cancellationToken);
+
+        // 2. Create video entity
+        var video = new Video
+        {
+            Id = Guid.NewGuid(),
+            Title = request.Title,
+            FilePath = filePath,
+            UserId = request.UserId
+        };
+
+        // 3. Persist
+        await _videoRepository.AddAsync(video, cancellationToken);
+        await _unitOfWork.SaveChangesAsync(cancellationToken);
+
+        return Result<UploadVideoResponse>.Success(new UploadVideoResponse
+        {
+            JobId = video.Id,
+            Status = "queued"
+        });
+    }
+}
+
+// Features/Videos/Commands/UploadVideo/UploadVideoCommandValidator.cs
+public class UploadVideoCommandValidator : AbstractValidator<UploadVideoCommand>
+{
+    public UploadVideoCommandValidator()
+    {
+        RuleFor(x => x.File)
+            .NotNull().WithMessage("Video file is required")
+            .Must(f => f.Length <= 2 * 1024 * 1024 * 1024)
+                .WithMessage("Video file size must not exceed 2GB");
+
+        RuleFor(x => x.Title)
+            .NotEmpty().WithMessage("Title is required")
+            .MaximumLength(200).WithMessage("Title must not exceed 200 characters");
+    }
+}
+```
+
+### Query Implementation Example
+
+```csharp
+// Features/Videos/Queries/GetVideoById/GetVideoByIdQuery.cs
+public record GetVideoByIdQuery(Guid Id) : IRequest<Result<VideoDto>>;
+
+// Features/Videos/Queries/GetVideoById/GetVideoByIdQueryHandler.cs
+public class GetVideoByIdQueryHandler
+    : IRequestHandler<GetVideoByIdQuery, Result<VideoDto>>
+{
+    private readonly IVideoRepository _videoRepository;
+    private readonly IMapper _mapper;
+
+    public async Task<Result<VideoDto>> Handle(
+        GetVideoByIdQuery request,
+        CancellationToken cancellationToken)
+    {
+        var video = await _videoRepository
+            .GetWithProcessingJobAsync(request.Id, cancellationToken);
+
+        if (video == null)
+            return Result<VideoDto>.Failure("Video not found");
+
+        return Result<VideoDto>.Success(_mapper.Map<VideoDto>(video));
+    }
+}
+```
+
+### MediatR Pipeline Behaviors
+
+```csharp
+// Common/Behaviors/ValidationBehavior.cs
+public class ValidationBehavior<TRequest, TResponse>
+    : IPipelineBehavior<TRequest, TResponse>
+    where TRequest : IRequest<TResponse>
+{
+    private readonly IEnumerable<IValidator<TRequest>> _validators;
+
+    public async Task<TResponse> Handle(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
+        CancellationToken cancellationToken)
+    {
+        if (_validators.Any())
+        {
+            var context = new ValidationContext<TRequest>(request);
+            var validationResults = await Task.WhenAll(
+                _validators.Select(v => v.ValidateAsync(context, cancellationToken)));
+
+            var failures = validationResults
+                .SelectMany(r => r.Errors)
+                .Where(f => f != null)
+                .ToList();
+
+            if (failures.Any())
+                throw new ValidationException(failures);
+        }
+
+        return await next();
+    }
+}
+```
+
+### Dependency Injection Setup
+
+```csharp
+// DependencyInjection.cs
+public static class DependencyInjection
+{
+    public static IServiceCollection AddApplicationLayer(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        // Register MediatR
+        services.AddMediatR(cfg => {
+            cfg.RegisterServicesFromAssembly(
+                Assembly.GetExecutingAssembly());
+            cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+            cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
+            cfg.AddOpenBehavior(typeof(PerformanceBehavior<,>));
+        });
+
+        // Register FluentValidation
+        services.AddValidatorsFromAssembly(
+            Assembly.GetExecutingAssembly());
+
+        // Register AutoMapper
+        services.AddAutoMapper(
+            Assembly.GetExecutingAssembly());
+
+        return services;
+    }
+}
+```
 
 ---
 
