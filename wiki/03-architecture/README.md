@@ -56,6 +56,10 @@ Hệ thống được thiết kế theo kiến trúc **Clean Architecture** (cò
 │  │                      Infrastructure Layer                            ││
 │  │   Repositories │ EF Core │ External Services │ File Storage         ││
 │  └─────────────────────────────────────────────────────────────────────┘│
+│  ┌─────────────────────────────────────────────────────────────────────┐│
+│  │                        Core Layer                                    ││
+│  │   Extensions │ Constants │ Helpers │ Shared Enums │ Security Utils  ││
+│  └─────────────────────────────────────────────────────────────────────┘│
 └─────────────────────────────────────────────────────────────────────────┘
                                     │
                                     ▼
@@ -124,8 +128,48 @@ Clean Architecture dựa trên các nguyên tắc sau:
 │    Layer         │  depends   │    Layer         │
 │(Entities/Events) │     on     │(Repositories/    │
 └──────────────────┘            │  External Svc)   │
-                                └──────────────────┘
+       │                        └──────────────────┘
+       │ depends on                      │
+       ▼                                 ▼
+┌──────────────────────────────────────────────────┐
+│                  Core Layer                       │
+│  (Extensions, Constants, Helpers, Shared Enums)  │
+└──────────────────────────────────────────────────┘
 ```
+
+### Core Layer (AutoProcess.Core)
+
+**Vị trí trong kiến trúc:**
+
+Core Layer là layer thấp nhất, chứa các tiện ích cross-cutting mà tất cả các layer khác đều có thể phụ thuộc vào. Khác với Domain Layer (chứa business logic cốt lõi), Core Layer chứa các utility không mang tính business-specific.
+
+**Trách nhiệm:**
+
+- **Constants**: Định nghĩa các hằng số sử dụng xuyên suốt ứng dụng
+- **Extensions**: Các extension methods cho các kiểu dữ liệu cơ bản (string, DateTime, IEnumerable, etc.)
+- **Helpers**: Các static helper classes cho các thao tác thường gặp
+- **Shared Enums**: Các enum sử dụng ở nhiều layer
+- **Cross-layer Interfaces**: Các interface cơ bản như `IAuditableEntity`, `ISoftDelete`
+- **Security Utilities**: Các utility về mã hóa, hashing, JWT
+- **Validation**: Các validator và validation rules chung
+
+**Dependency Rule:**
+
+```
+Core Layer ← Domain Layer ← Application Layer ← Infrastructure Layer ← API Layer
+     ↑____________↑____________↑_______________↑_______________↑
+                    Tất cả các layer đều có thể phụ thuộc vào Core
+```
+
+**Khi nào dùng Core vs Domain:**
+
+| Core Layer                               | Domain Layer                                |
+| ---------------------------------------- | ------------------------------------------- |
+| `StringExtensions.ToSlug()`              | `Video.Title` (entity property)             |
+| `ApplicationConstants.MaxFileSize`       | `JobStatus` (business state)                |
+| `PathHelper.Combine()`                   | `Video.StartProcessing()` (domain behavior) |
+| `HashingService.HashPassword()`          | `BusinessRuleViolationException`            |
+| `IAuditableEntity` (technical interface) | `IDomainEvent` (business concept)           |
 
 ### Các nguyên tắc thiết kế đi kèm
 
@@ -262,7 +306,50 @@ Clean Architecture dựa trên các nguyên tắc sau:
 
 ```
 src/
-├── AutoProcess.Api/                        # API Layer (Presentation)
+ ├── AutoProcess.Core/                       # Core Layer (Cross-cutting concerns)
+ │   ├── Common/
+ │   │   ├── Constants/                      # Application constants
+ │   │   │   ├── ApplicationConstants.cs     # App-wide constants (e.g., CORS policies, claim types)
+ │   │   │   ├── ErrorCodes.cs               # Standardized error codes
+ │   │   │   ├── RolesConstants.cs           # Role names (Admin, User)
+ │   │   │   └── ProcessingConstants.cs      # Processing-related constants
+ │   │   ├── Extensions/                     # C# extension methods
+ │   │   │   ├── StringExtensions.cs         # String utilities (ToSlug, Truncate, etc.)
+ │   │   │   ├── DateTimeExtensions.cs       # DateTime utilities (ToUnixTimestamp, ToVnTime, etc.)
+ │   │   │   ├── EnumerableExtensions.cs     # Collection utilities (ForEach, Paginate, etc.)
+ │   │   │   ├── GuidExtensions.cs           # Guid utilities
+ │   │   │   └── ObjectExtensions.cs         # Object utilities (ToJson, Clone, etc.)
+ │   │   ├── Helpers/                        # Static helper classes
+ │   │   │   ├── PathHelper.cs               # Path manipulation utilities
+ │   │   │   ├── FileHelper.cs               # File operations helper
+ │   │   │   ├── ValidationHelper.cs         # Validation utilities
+ │   │   │   └── EncryptionHelper.cs         # Encryption/Hashing utilities
+ │   │   ├── Enums/                          # Shared enums across layers
+ │   │   │   ├── ResultStatus.cs             # Operation result status
+ │   │   │   ├── ErrorCode.cs                # Standardized error codes
+ │   │   │   └── LanguageCode.cs             # ISO language codes
+ │   │   └── Interfaces/                     # Cross-layer interfaces
+ │   │       ├── IAuditableEntity.cs         # Interface for entities with audit info
+ │   │       ├── ISoftDelete.cs              # Interface for soft-delete entities
+ │   │       └── IEntity.cs                  # Base entity interface
+ │   ├── Security/
+ │   │   ├── Cryptography/
+ │   │   │   ├── HashingService.cs           # Password hashing utilities
+ │   │   │   └── EncryptionService.cs        # Encryption/Decryption utilities
+ │   │   └── Jwt/
+ │   │       ├── JwtSettings.cs              # JWT configuration options
+ │   │       └── JwtConstants.cs             # JWT-related constants
+ │   ├── Validation/
+ │   │   ├── Validators/                     # Shared validators
+ │   │   │   ├── EmailValidator.cs           # Email validation rules
+ │   │   │   ├── PasswordValidator.cs        # Password validation rules
+ │   │   │   └── FileValidator.cs            # File validation rules
+ │   │   └── Rules/                          # Validation rules
+ │   │       ├── IValidationRule.cs          # Validation rule interface
+ │   │       └── ValidationResult.cs         # Validation result model
+ │   └── AutoProcess.Core.csproj
+ │
+ ├── AutoProcess.Api/                        # API Layer (Presentation)
 │   ├── Controllers/
 │   │   ├── VideoController.cs              # API endpoints cho Video
 │   │   ├── AudioController.cs              # API endpoints cho Audio
@@ -423,19 +510,17 @@ src/
 │   ├── DependencyInjection.cs              # Infrastructure DI setup
 │   └── AutoProcess.Infrastructure.csproj
 │
-├── AutoProcess.Shared/                     # Shared Kernel (Cross-cutting)
-│   ├── Constants/
-│   │   ├── ApplicationConstants.cs
-│   │   └── ErrorCodes.cs
-│   ├── Extensions/
-│   │   ├── StringExtensions.cs
-│   │   ├── DateTimeExtensions.cs
-│   │   └── EnumerableExtensions.cs
-│   ├── Helpers/
-│   │   └── PathHelper.cs
-│   └── AutoProcess.Shared.csproj
-│
 └── tests/
+    ├── AutoProcess.Core.Tests/             # Unit tests for Core
+    │   ├── Common/
+    │   │   ├── Extensions/
+    │   │   │   ├── StringExtensionsTests.cs
+    │   │   │   └── DateTimeExtensionsTests.cs
+    │   │   └── Helpers/
+    │   │       └── PathHelperTests.cs
+    │   └── Security/
+    │       └── Cryptography/
+    │           └── HashingServiceTests.cs
     ├── AutoProcess.Domain.Tests/           # Unit tests for Domain
     │   ├── Entities/
     │   │   └── VideoTests.cs
