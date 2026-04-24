@@ -9,7 +9,7 @@ Dự án **Auto Process** là hệ thống tự động xử lý video để loc
 | Layer        | Technology                                  |
 | ------------ | ------------------------------------------- |
 | **Frontend** | React 18+ với TypeScript, Vite, Material-UI |
-| **Backend**  | .NET 8 (ASP.NET Core), Clean Architecture   |
+| **Backend**  | .NET 10 (ASP.NET Core), Clean Architecture  |
 | **Database** | PostgreSQL, Redis                           |
 | **AI/ML**    | Python, Whisper, VnTTS, NLLB, Llama 2       |
 | **Storage**  | Azure Blob Storage / AWS S3                 |
@@ -126,4 +126,4 @@ Wiki được tổ chức thành các thư mục sau:
 - **Version:** 2.0.0
 - **Last Updated:** 2026-04-24
 - **Status:** Planning Phase
-- **Tech Stack:** .NET 8 + React 18
+- **Tech Stack:** .NET 10 + React 18

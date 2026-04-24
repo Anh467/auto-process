@@ -227,13 +227,13 @@ Core Layer ← Domain Layer ← Application Layer ← Infrastructure Layer ← A
 
 ### 2. .NET Backend API
 
-| Thuộc tính            | Mô tả                 |
-| --------------------- | --------------------- |
-| **Framework**         | .NET 8 (ASP.NET Core) |
-| **Architecture**      | Clean Architecture    |
-| **ORM**               | Entity Framework Core |
-| **Background Jobs**   | Hangfire              |
-| **API Documentation** | Swagger/OpenAPI       |
+| Thuộc tính            | Mô tả                  |
+| --------------------- | ---------------------- |
+| **Framework**         | .NET 10 (ASP.NET Core) |
+| **Architecture**      | Clean Architecture     |
+| **ORM**               | Entity Framework Core  |
+| **Background Jobs**   | Hangfire               |
+| **API Documentation** | Swagger/OpenAPI        |
 
 ### 3. AI/ML Services (Python)
 
@@ -251,18 +251,18 @@ Core Layer ← Domain Layer ← Application Layer ← Infrastructure Layer ← A
 
 ### Backend (.NET)
 
-| Component       | Công nghệ             | Phiên bản |
-| --------------- | --------------------- | --------- |
-| Framework       | .NET 8 (ASP.NET Core) | 8.0+      |
-| Language        | C#                    | 12.0+     |
-| ORM             | Entity Framework Core | 8.0+      |
-| Background Jobs | Hangfire              | 1.8+      |
-| Validation      | FluentValidation      | 11.0+     |
-| Mapping         | AutoMapper            | 12.0+     |
-| Logging         | Serilog               | 3.0+      |
-| Testing         | xUnit / NUnit         | Latest    |
-| API Docs        | Swashbuckle           | 6.0+      |
-| Mediator        | MediatR               | 12.0+     |
+| Component       | Công nghệ              | Phiên bản |
+| --------------- | ---------------------- | --------- |
+| Framework       | .NET 10 (ASP.NET Core) | 10.0+     |
+| Language        | C#                     | 14.0+     |
+| ORM             | Entity Framework Core  | 8.0+      |
+| Background Jobs | Hangfire               | 1.8+      |
+| Validation      | FluentValidation       | 11.0+     |
+| Mapping         | AutoMapper             | 12.0+     |
+| Logging         | Serilog                | 3.0+      |
+| Testing         | xUnit / NUnit          | Latest    |
+| API Docs        | Swashbuckle            | 6.0+      |
+| Mediator        | MediatR                | 12.0+     |
 
 ### Frontend (React)
 
