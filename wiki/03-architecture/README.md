@@ -9,7 +9,8 @@
 5. [Công nghệ sử dụng](#công-nghệ-sử-dụng)
 6. [Chi tiết .NET Clean Architecture](#chi-tiết-net-clean-architecture)
 7. [Kiến trúc React Frontend](#kiến-trúc-react-frontend)
-8. [Tài liệu tham khảo](#tài-liệu-tham-khảo)
+8. [AI Services Security Architecture](#ai-services-security-architecture)
+9. [Tài liệu tham khảo](#tài-liệu-tham-khảo)
 
 ---
 
@@ -1921,6 +1922,19 @@ export function FormField({ name, label, error, children }: FormFieldProps) {
 - [Zustand](https://zustand-demo.pmnd.rs/) - State management
 
 ```
+
+---
+
+## AI Services Security Architecture
+
+Chi tiết về kiến trúc bảo mật cho các AI/ML Services, bao gồm:
+
+- Network Isolation với Docker
+- API Key Authentication
+- Service-to-Service Communication với HMAC signatures
+- Implementation Guide
+
+📄 Xem chi tiết tại: [AI Services Security Architecture](./ai-services-security.md)
 
 ---
 
