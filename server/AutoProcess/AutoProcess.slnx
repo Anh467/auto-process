@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="AutoProcess.Api/AutoProcess.Api.csproj" />
+  <Project Path="AutoProcess.Application/AutoProcess.Application.csproj" />
+  <Project Path="AutoProcess.Core/AutoProcess.Core.csproj" />
+  <Project Path="AutoProcess.Domain/AutoProcess.Domain.csproj" />
+  <Project Path="AutoProcess.Infrastructure/AutoProcess.Infrastructure.csproj" />
+</Solution>

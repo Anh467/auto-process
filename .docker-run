@@ -1,0 +1,14 @@
+# Lần đầu hoặc khi có thay đổi code
+docker compose up --build
+
+# Các lần sau (không cần build lại)
+docker compose up
+
+# Chạy nền
+docker compose up -d
+
+# Dừng
+docker compose down
+
+# Dừng và xóa data
+docker compose down -v

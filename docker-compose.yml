@@ -1,0 +1,47 @@
+# docker-compose.yml
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: autoprocess-sqlserver
+    environment:
+      SA_PASSWORD: "nguyenanhviet"
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Express"
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "/opt/mssql-tools/bin/sqlcmd",
+          "-S",
+          "localhost",
+          "-U",
+          "sa",
+          "-P",
+          "nguyenanhviet",
+          "-Q",
+          "SELECT 1",
+        ]
+      interval: 10s
+      retries: 5
+      start_period: 20s
+
+  api:
+    build:
+      context: ./server/AutoProcess
+      dockerfile: AutoProcess.Api/Dockerfile
+    container_name: autoprocess-api
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=AutoProcess;User Id=sa;Password=nguyenanhviet;TrustServerCertificate=True;
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+
+volumes:
+  sqlserver_data:
